@@ -15,7 +15,21 @@
 
 ## Quick Start
 
-### Docker
+## 使用 Docker 部署 (推荐)
+
+项目内置了 `Dockerfile`，打包了所需的 Go 运行环境、Chromium 以及能够渲染中文的必要字体，开箱即用。
+
+### 1. 构建镜像
+
+在项目根目录下执行以下命令构建 Docker 镜像：
+
+```bash
+docker build -t qq-quote-go .
+```
+
+### 2. 运行容器
+
+使用构建好的镜像启动容器，你可以通过环境变量修改配置：
 
 ```bash
 docker run -d \
@@ -23,7 +37,22 @@ docker run -d \
   --restart unless-stopped \
   -p 5000:5000 \
   -e POOL_SIZE=4 \
-  ghcr.io/your-name/qq-quote-go
+  qq-quote-go
+```
+
+> **提示：** 
+> - `-p 5000:5000`：将容器的 5000 端口映射到宿主机 5000 端口。
+> - `-e POOL_SIZE=4`：配置浏览器的页面渲染并发池大小，建议设置为 CPU 核心数。
+
+### 3. 测试调用
+
+容器启动后，可以直接使用 curl 进行调用测试，将结果保存为 `out.png`：
+
+```bash
+curl -X POST http://localhost:5000/png/ \
+  -H "Content-Type: application/json" \
+  -d '[{"user_id": 10000, "user_nickname": "管理员", "message": "Docker 部署成功啦！"}]' \
+  -o out.png
 ```
 
 ### 本地运行
