@@ -17,7 +17,7 @@ const quoteHTML = `<!DOCTYPE html>
   #app {
     background: #1e1e2e;
     padding: 16px 12px;
-    min-width: 300px;
+    min-width: 0;
     max-width: 600px;
     display: inline-block;
     border-radius: 12px;
@@ -36,7 +36,7 @@ const quoteHTML = `<!DOCTYPE html>
   .avatar {
     width: 42px;
     height: 42px;
-    border-radius: 8px;
+    border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
     background: #333;
