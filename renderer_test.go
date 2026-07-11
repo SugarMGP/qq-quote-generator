@@ -27,7 +27,7 @@ func TestThemeForHourUsesLightDuringDaytime(t *testing.T) {
 	}
 
 	for hour, want := range tests {
-		if got := themeForHour(hour); got != want {
+		if got := themeForHour(hour).Class; got != want {
 			t.Fatalf("themeForHour(%d) = %q, want %q", hour, got, want)
 		}
 	}

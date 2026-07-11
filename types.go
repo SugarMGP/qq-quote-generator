@@ -30,7 +30,7 @@ type renderData struct {
 
 type processedMessage struct {
 	Nickname string
-	Avatar   template.URL // 最终用于 <img src="..."> 的值
+	Avatar   template.URL
 	Segments []processedMessageSegment
 }
 

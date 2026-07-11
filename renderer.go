@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"html/template"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-rod/rod/lib/proto"
@@ -43,7 +40,7 @@ func (r *Renderer) Render(ctx context.Context, messages []Message) (png []byte, 
 
 	// 2. 渲染 HTML 模板到字符串
 	var buf bytes.Buffer
-	if err := r.tmpl.Execute(&buf, renderData{Messages: processed, Theme: themeForTime(time.Now())}); err != nil {
+	if err := r.tmpl.Execute(&buf, renderData{Messages: processed, Theme: themeForTime(time.Now()).Class}); err != nil {
 		return nil, fmt.Errorf("template: %w", err)
 	}
 	html := buf.String()
@@ -92,17 +89,6 @@ func (r *Renderer) Render(ctx context.Context, messages []Message) (png []byte, 
 	return png, nil
 }
 
-func themeForTime(t time.Time) string {
-	return themeForHour(t.Hour())
-}
-
-func themeForHour(hour int) string {
-	if hour >= 6 && hour < 18 {
-		return "theme-light"
-	}
-	return "theme-dark"
-}
-
 // RenderBase64 返回 base64 编码的 PNG
 func (r *Renderer) RenderBase64(ctx context.Context, messages []Message) (string, error) {
 	png, err := r.Render(ctx, messages)
@@ -114,13 +100,12 @@ func (r *Renderer) RenderBase64(ctx context.Context, messages []Message) (string
 
 // processMessages 将原始 Message 列表转换为模板可用的结构
 func (r *Renderer) processMessages(messages []Message) ([]processedMessage, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
 	result := make([]processedMessage, 0, len(messages))
 
 	for _, msg := range messages {
 		pm := processedMessage{
 			Nickname: msg.UserNickname,
-			Avatar:   safeImageURL(resolveAvatar(client, msg)),
+			Avatar:   safeImageURL(resolveAvatar(msg)),
 		}
 
 		segs, err := parseMessageField(msg.Message)
@@ -132,75 +117,4 @@ func (r *Renderer) processMessages(messages []Message) ([]processedMessage, erro
 		result = append(result, pm)
 	}
 	return result, nil
-}
-
-func processMessageSegments(segments []MessageSegment) []processedMessageSegment {
-	result := make([]processedMessageSegment, 0, len(segments))
-	for _, segment := range segments {
-		result = append(result, processedMessageSegment{
-			Type:       segment.Type,
-			Kind:       segment.Kind,
-			Text:       segment.Text,
-			URL:        safeImageURL(segment.URL),
-			ImageClass: imageClassForKind(segment.Kind),
-		})
-	}
-	return result
-}
-
-func imageClassForKind(kind string) string {
-	switch kind {
-	case "emoji":
-		return "bubble-img bubble-img-emoji"
-	case "sticker":
-		return "bubble-img bubble-img-sticker"
-	default:
-		return "bubble-img"
-	}
-}
-
-func safeImageURL(raw string) template.URL {
-	raw = strings.TrimSpace(raw)
-	lower := strings.ToLower(raw)
-	switch {
-	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"), strings.HasPrefix(lower, "data:image/"):
-		return template.URL(raw)
-	default:
-		return ""
-	}
-}
-
-// resolveAvatar 返回可嵌入 <img src> 的头像值
-func resolveAvatar(_ *http.Client, msg Message) string {
-	if msg.Avatar != "" {
-		return msg.Avatar
-	}
-	if msg.UserID > 0 {
-		// QQ 头像 CDN，与原项目保持一致
-		return fmt.Sprintf("https://q1.qlogo.cn/g?b=qq&nk=%d&s=100", msg.UserID)
-	}
-	return ""
-}
-
-// parseMessageField 兼容字符串和 []MessageSegment 两种格式
-func parseMessageField(raw interface{}) ([]MessageSegment, error) {
-	if raw == nil {
-		return nil, nil
-	}
-	switch v := raw.(type) {
-	case string:
-		return []MessageSegment{{Type: "text", Text: v}}, nil
-	case []interface{}:
-		data, err := json.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
-		var segs []MessageSegment
-		if err := json.Unmarshal(data, &segs); err != nil {
-			return nil, err
-		}
-		return segs, nil
-	default:
-		return []MessageSegment{{Type: "text", Text: fmt.Sprintf("%v", v)}}, nil
-	}
 }
