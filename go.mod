@@ -4,6 +4,7 @@ go 1.25.8
 
 require (
 	github.com/gin-gonic/gin v1.12.0
+	github.com/go-text/typesetting v0.3.4
 	golang.org/x/image v0.32.0
 )
 

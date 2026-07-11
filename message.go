@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"strings"
 	"time"
 )
@@ -31,30 +30,11 @@ func themeForHour(hour int) Theme {
 	return darkTheme
 }
 
-func processMessageSegments(segments []MessageSegment) []processedMessageSegment {
-	result := make([]processedMessageSegment, 0, len(segments))
-	for _, segment := range segments {
-		result = append(result, processedMessageSegment{Type: segment.Type, Kind: segment.Kind, Text: segment.Text, URL: safeImageURL(segment.URL), ImageClass: imageClassForKind(segment.Kind)})
-	}
-	return result
-}
-
-func imageClassForKind(kind string) string {
-	switch kind {
-	case "emoji":
-		return "bubble-img bubble-img-emoji"
-	case "sticker":
-		return "bubble-img bubble-img-sticker"
-	default:
-		return "bubble-img"
-	}
-}
-
-func safeImageURL(raw string) template.URL {
+func safeImageURL(raw string) string {
 	raw = strings.TrimSpace(raw)
 	lower := strings.ToLower(raw)
 	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "data:image/") {
-		return template.URL(raw)
+		return raw
 	}
 	return ""
 }

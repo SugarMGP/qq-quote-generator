@@ -15,6 +15,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("renderer: %v", err)
 	}
+	defer renderer.Close()
 
 	// 路由
 	r := gin.Default()

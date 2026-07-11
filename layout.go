@@ -3,6 +3,7 @@ package main
 import (
 	"math"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -13,7 +14,7 @@ const (
 	rowGap         = 10.0
 	rowMargin      = 14.0
 	nicknameSize   = 12.0
-	nicknameHeight = 14.0
+	nicknameHeight = 16.0
 	nicknameMargin = 4.0
 	bubblePadX     = 12.0
 	bubblePadY     = 8.0
@@ -67,6 +68,7 @@ type RowLayout struct {
 type CardLayout struct {
 	Width, Height float64
 	Theme         Theme
+	FontFamily    string
 	Rows          []RowLayout
 }
 
@@ -83,13 +85,17 @@ func containSize(width, height, maxWidth, maxHeight float64) (float64, float64) 
 }
 
 func (e *LayoutEngine) Layout(messages []PreparedMessage, theme Theme) CardLayout {
-	card := CardLayout{Width: cardPadX * 2, Height: cardPadY * 2, Theme: theme}
+	card := CardLayout{Width: cardPadX * 2, Height: cardPadY * 2, Theme: theme, FontFamily: e.fonts.Family()}
 	availableContent := cardMaxWidth - cardPadX*2 - avatarSize - rowGap
 	maxRowWidth := 0.0
 	rows := make([]RowLayout, 0, len(messages))
 	y := cardPadY
 	for _, message := range messages {
 		row := e.layoutRow(message, theme, availableContent, y)
+		if e.messageRequiresMaxWidth(message, availableContent-bubblePadX*2) {
+			row.Bubble.Rect.W = availableContent
+			row.Bounds.W = avatarSize + rowGap + availableContent
+		}
 		rows = append(rows, row)
 		rowWidth := avatarSize + rowGap + math.Max(row.Nickname.Rect.W, row.Bubble.Rect.W)
 		maxRowWidth = math.Max(maxRowWidth, rowWidth)
@@ -101,6 +107,20 @@ func (e *LayoutEngine) Layout(messages []PreparedMessage, theme Theme) CardLayou
 	}
 	card.Rows = rows
 	return card
+}
+
+func (e *LayoutEngine) messageRequiresMaxWidth(message PreparedMessage, maxInnerWidth float64) bool {
+	for _, segment := range message.Segments {
+		if segment.Type != "text" {
+			continue
+		}
+		for _, paragraph := range strings.Split(segment.Text, "\n") {
+			if e.fonts.Measure(paragraph, textSize) > maxInnerWidth {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (e *LayoutEngine) layoutRow(message PreparedMessage, theme Theme, maxContentWidth, y float64) RowLayout {
@@ -162,20 +182,46 @@ func (e *LayoutEngine) wrapText(text string, maxWidth, size float64) []TextLine 
 			lines = append(lines, TextLine{})
 			continue
 		}
-		var current []rune
-		for _, char := range []rune(paragraph) {
-			candidate := string(append(current, char))
-			width := e.fonts.Measure(candidate, size)
-			if len(current) > 0 && width > maxWidth {
-				value := string(current)
-				lines = append(lines, TextLine{Text: value, Width: e.fonts.Measure(value, size)})
-				current = []rune{char}
-			} else {
-				current = append(current, char)
+		current := ""
+		for _, token := range lineTokens(paragraph) {
+			if current != "" && e.fonts.Measure(current+token, size) > maxWidth {
+				lines = append(lines, TextLine{Text: current, Width: e.fonts.Measure(current, size)})
+				current = ""
+			}
+			if e.fonts.Measure(token, size) <= maxWidth {
+				current += token
+				continue
+			}
+			for _, char := range token {
+				if current != "" && e.fonts.Measure(current+string(char), size) > maxWidth {
+					lines = append(lines, TextLine{Text: current, Width: e.fonts.Measure(current, size)})
+					current = ""
+				}
+				current += string(char)
 			}
 		}
-		value := string(current)
-		lines = append(lines, TextLine{Text: value, Width: e.fonts.Measure(value, size)})
+		lines = append(lines, TextLine{Text: current, Width: e.fonts.Measure(current, size)})
 	}
 	return lines
+}
+
+func lineTokens(text string) []string {
+	var tokens []string
+	var latin []rune
+	flush := func() {
+		if len(latin) > 0 {
+			tokens = append(tokens, string(latin))
+			latin = nil
+		}
+	}
+	for _, char := range text {
+		if char <= unicode.MaxASCII && (unicode.IsLetter(char) || unicode.IsDigit(char)) {
+			latin = append(latin, char)
+			continue
+		}
+		flush()
+		tokens = append(tokens, string(char))
+	}
+	flush()
+	return tokens
 }

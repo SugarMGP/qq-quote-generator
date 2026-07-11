@@ -1,7 +1,5 @@
 package main
 
-import "html/template"
-
 // MessageSegment 对应消息中的单个内容片段（文本或图片）
 type MessageSegment struct {
 	Type string `json:"type"` // "text" | "image"
@@ -20,24 +18,4 @@ type Message struct {
 	//   1. 纯字符串（向后兼容原项目）
 	//   2. []MessageSegment（支持图文混排）
 	Message interface{} `json:"message"`
-}
-
-// renderData 是传给 HTML 模板的结构
-type renderData struct {
-	Messages []processedMessage
-	Theme    string
-}
-
-type processedMessage struct {
-	Nickname string
-	Avatar   template.URL
-	Segments []processedMessageSegment
-}
-
-type processedMessageSegment struct {
-	Type       string
-	Kind       string
-	Text       string
-	URL        template.URL
-	ImageClass string
 }

@@ -20,11 +20,11 @@ type Renderer struct {
 }
 
 func NewRenderer() (*Renderer, error) {
-	fonts, err := NewFontManager(embeddedFont)
+	fonts, err := NewSystemFontManager(defaultFontFamilies)
 	if err != nil {
 		return nil, fmt.Errorf("font manager: %w", err)
 	}
-	rasterizer, err := NewResvgRasterizer(embeddedFont)
+	rasterizer, err := NewResvgRasterizer()
 	if err != nil {
 		return nil, fmt.Errorf("resvg: %w", err)
 	}
@@ -33,6 +33,8 @@ func NewRenderer() (*Renderer, error) {
 		layout: NewLayoutEngine(fonts), svg: SVGBuilder{}, rasterizer: rasterizer, now: time.Now,
 	}, nil
 }
+
+func (r *Renderer) Close() { r.rasterizer.Close() }
 
 func (r *Renderer) Render(ctx context.Context, messages []Message) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultRenderTimeout)
@@ -65,7 +67,7 @@ func (r *Renderer) prepareMessages(ctx context.Context, messages []Message) ([]P
 	result := make([]PreparedMessage, 0, len(messages))
 	for _, message := range messages {
 		prepared := PreparedMessage{Nickname: message.UserNickname}
-		prepared.Avatar = r.loadImage(ctx, string(safeImageURL(resolveAvatar(message))))
+		prepared.Avatar = r.loadImage(ctx, safeImageURL(resolveAvatar(message)))
 		segments, err := parseMessageField(message.Message)
 		if err != nil {
 			return nil, fmt.Errorf("parse message: %w", err)
@@ -73,7 +75,7 @@ func (r *Renderer) prepareMessages(ctx context.Context, messages []Message) ([]P
 		for _, segment := range segments {
 			item := PreparedSegment{Type: segment.Type, Kind: segment.Kind, Text: segment.Text}
 			if segment.Type == "image" {
-				item.Image = r.loadImage(ctx, string(safeImageURL(segment.URL)))
+				item.Image = r.loadImage(ctx, safeImageURL(segment.URL))
 			}
 			prepared.Segments = append(prepared.Segments, item)
 		}

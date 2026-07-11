@@ -13,31 +13,45 @@ import (
 	"image"
 	"image/png"
 	"math"
+	"sync"
 	"unsafe"
 )
 
-type ResvgRasterizer struct{ font []byte }
-
-func NewResvgRasterizer(font []byte) (*ResvgRasterizer, error) {
-	if len(font) == 0 {
-		return nil, fmt.Errorf("resvg font is empty")
-	}
-	return &ResvgRasterizer{font: font}, nil
+type ResvgRasterizer struct {
+	mu      sync.RWMutex
+	options *C.resvg_options
 }
 
-func (r *ResvgRasterizer) Render(svg []byte) ([]byte, error) {
-	if len(svg) == 0 {
-		return nil, fmt.Errorf("resvg input is empty")
-	}
+func NewResvgRasterizer() (*ResvgRasterizer, error) {
 	options := C.resvg_options_create()
 	if options == nil {
 		return nil, fmt.Errorf("create resvg options")
 	}
-	defer C.resvg_options_destroy(options)
-	C.resvg_options_load_font_data(options, (*C.char)(unsafe.Pointer(&r.font[0])), C.uintptr_t(len(r.font)))
+	C.resvg_options_load_system_fonts(options)
+	return &ResvgRasterizer{options: options}, nil
+}
+
+func (r *ResvgRasterizer) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.options != nil {
+		C.resvg_options_destroy(r.options)
+		r.options = nil
+	}
+}
+
+func (r *ResvgRasterizer) Render(svg []byte) ([]byte, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.options == nil {
+		return nil, fmt.Errorf("resvg rasterizer is closed")
+	}
+	if len(svg) == 0 {
+		return nil, fmt.Errorf("resvg input is empty")
+	}
 
 	var tree *C.resvg_render_tree
-	result := C.resvg_parse_tree_from_data((*C.char)(unsafe.Pointer(&svg[0])), C.uintptr_t(len(svg)), options, &tree)
+	result := C.resvg_parse_tree_from_data((*C.char)(unsafe.Pointer(&svg[0])), C.uintptr_t(len(svg)), r.options, &tree)
 	if result != C.RESVG_OK {
 		return nil, fmt.Errorf("parse SVG: resvg error %d", int32(result))
 	}
