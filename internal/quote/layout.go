@@ -37,30 +37,27 @@ type PreparedSegment struct {
 }
 
 type TextLine struct {
-	Text  string
-	Width float64
+	Text     string
+	Width    float64
+	Baseline float64
 }
 type TextLayout struct {
 	Rect     Rect
 	FontSize float64
 	Lines    []TextLine
-	Color    string
 }
 type SegmentLayout struct {
 	Type, Kind, DataURI string
 	Rect                Rect
 	Lines               []TextLine
-	Missing             bool
 }
 type BubbleLayout struct {
-	Rect               Rect
-	PaddingX, PaddingY float64
+	Rect Rect
 }
 type RowLayout struct {
-	Bounds        Rect
+	Height        float64
 	Avatar        Rect
 	AvatarDataURI string
-	ContentX      float64
 	Nickname      TextLayout
 	Bubble        BubbleLayout
 	Segments      []SegmentLayout
@@ -94,12 +91,11 @@ func (e *LayoutEngine) Layout(messages []PreparedMessage, theme Theme) CardLayou
 		row := e.layoutRow(message, theme, availableContent, y)
 		if e.messageRequiresMaxWidth(message, availableContent-bubblePadX*2) {
 			row.Bubble.Rect.W = availableContent
-			row.Bounds.W = avatarSize + rowGap + availableContent
 		}
 		rows = append(rows, row)
 		rowWidth := avatarSize + rowGap + math.Max(row.Nickname.Rect.W, row.Bubble.Rect.W)
 		maxRowWidth = math.Max(maxRowWidth, rowWidth)
-		y += row.Bounds.H + rowMargin
+		y += row.Height + rowMargin
 	}
 	if len(rows) > 0 {
 		card.Height = y - rowMargin + cardPadY
@@ -125,7 +121,8 @@ func (e *LayoutEngine) messageRequiresMaxWidth(message PreparedMessage, maxInner
 
 func (e *LayoutEngine) layoutRow(message PreparedMessage, theme Theme, maxContentWidth, y float64) RowLayout {
 	contentX := cardPadX + avatarSize + rowGap
-	nicknameWidth := e.fonts.Measure(message.Nickname, nicknameSize)
+	nicknameLine := e.textLine(message.Nickname, nicknameSize, nicknameHeight)
+	nicknameWidth := nicknameLine.Width
 	maxInnerWidth := maxContentWidth - bubblePadX*2
 	segments := make([]SegmentLayout, 0, len(message.Segments))
 	innerWidth, innerHeight := 0.0, 0.0
@@ -133,9 +130,9 @@ func (e *LayoutEngine) layoutRow(message PreparedMessage, theme Theme, maxConten
 		if index > 0 {
 			innerHeight += segmentMargin
 		}
-		layout := SegmentLayout{Type: segment.Type, Kind: segment.Kind, DataURI: segment.Image.DataURI, Missing: segment.Image.Missing}
+		layout := SegmentLayout{Type: segment.Type, Kind: segment.Kind, DataURI: segment.Image.DataURI}
 		if segment.Type == "text" {
-			layout.Lines = e.wrapText(segment.Text, maxInnerWidth, textSize)
+			layout.Lines = e.wrapText(segment.Text, maxInnerWidth, textSize, textLineHeight)
 			for _, line := range layout.Lines {
 				innerWidth = math.Max(innerWidth, line.Width)
 			}
@@ -165,27 +162,26 @@ func (e *LayoutEngine) layoutRow(message PreparedMessage, theme Theme, maxConten
 	bubbleY := y + nicknameHeight + nicknameMargin
 	rowHeight := math.Max(avatarSize, nicknameHeight+nicknameMargin+bubbleHeight)
 	return RowLayout{
-		Bounds: Rect{X: cardPadX, Y: y, W: avatarSize + rowGap + math.Max(nicknameWidth, bubbleWidth), H: rowHeight},
+		Height: rowHeight,
 		Avatar: Rect{X: cardPadX, Y: y, W: avatarSize, H: avatarSize}, AvatarDataURI: message.Avatar.DataURI,
-		ContentX: contentX,
-		Nickname: TextLayout{Rect: Rect{X: contentX, Y: y, W: nicknameWidth, H: nicknameHeight}, FontSize: nicknameSize, Lines: []TextLine{{Text: message.Nickname, Width: nicknameWidth}}, Color: theme.NameColor},
-		Bubble:   BubbleLayout{Rect: Rect{X: contentX, Y: bubbleY, W: bubbleWidth, H: bubbleHeight}, PaddingX: bubblePadX, PaddingY: bubblePadY},
+		Nickname: TextLayout{Rect: Rect{X: contentX, Y: y, W: nicknameWidth, H: nicknameHeight}, FontSize: nicknameSize, Lines: []TextLine{nicknameLine}},
+		Bubble:   BubbleLayout{Rect: Rect{X: contentX, Y: bubbleY, W: bubbleWidth, H: bubbleHeight}},
 		Segments: segments,
 	}
 }
 
-func (e *LayoutEngine) wrapText(text string, maxWidth, size float64) []TextLine {
+func (e *LayoutEngine) wrapText(text string, maxWidth, size, lineHeight float64) []TextLine {
 	paragraphs := strings.Split(text, "\n")
 	lines := make([]TextLine, 0, len(paragraphs))
 	for _, paragraph := range paragraphs {
 		if paragraph == "" {
-			lines = append(lines, TextLine{})
+			lines = append(lines, e.textLine("", size, lineHeight))
 			continue
 		}
 		current := ""
 		for _, token := range lineTokens(paragraph) {
 			if current != "" && e.fonts.Measure(current+token, size) > maxWidth {
-				lines = append(lines, TextLine{Text: current, Width: e.fonts.Measure(current, size)})
+				lines = append(lines, e.textLine(current, size, lineHeight))
 				current = ""
 			}
 			if e.fonts.Measure(token, size) <= maxWidth {
@@ -194,15 +190,24 @@ func (e *LayoutEngine) wrapText(text string, maxWidth, size float64) []TextLine 
 			}
 			for _, char := range token {
 				if current != "" && e.fonts.Measure(current+string(char), size) > maxWidth {
-					lines = append(lines, TextLine{Text: current, Width: e.fonts.Measure(current, size)})
+					lines = append(lines, e.textLine(current, size, lineHeight))
 					current = ""
 				}
 				current += string(char)
 			}
 		}
-		lines = append(lines, TextLine{Text: current, Width: e.fonts.Measure(current, size)})
+		lines = append(lines, e.textLine(current, size, lineHeight))
 	}
 	return lines
+}
+
+func (e *LayoutEngine) textLine(text string, size, lineHeight float64) TextLine {
+	metrics := e.fonts.measureLine(text, size)
+	return TextLine{
+		Text:     text,
+		Width:    metrics.Width,
+		Baseline: (lineHeight-(metrics.Ascent-metrics.Descent))/2 + metrics.Ascent,
+	}
 }
 
 func lineTokens(text string) []string {

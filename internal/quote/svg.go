@@ -31,12 +31,12 @@ func writeRow(out *bytes.Buffer, index int, row RowLayout, theme Theme, fontFami
 	if strings.HasPrefix(row.AvatarDataURI, "data:image/") {
 		fmt.Fprintf(out, `<image x="%s" y="%s" width="42" height="42" href="%s" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatar-%d)"/>`, px(row.Avatar.X), px(row.Avatar.Y), row.AvatarDataURI, index)
 	}
-	writeText(out, row.Nickname.Rect.X, row.Nickname.Rect.Y+row.Nickname.FontSize, row.Nickname.FontSize, theme.NameColor, fontFamily, row.Nickname.Lines[0].Text)
+	writeText(out, row.Nickname.Rect.X, row.Nickname.Rect.Y+row.Nickname.Lines[0].Baseline, row.Nickname.FontSize, theme.NameColor, fontFamily, row.Nickname.Lines[0].Text)
 	writeBubble(out, row.Bubble.Rect, theme.BubbleBG)
 	for segmentIndex, segment := range row.Segments {
 		if segment.Type == "text" {
 			for lineIndex, line := range segment.Lines {
-				writeText(out, segment.Rect.X, segment.Rect.Y+textSize+float64(lineIndex)*textLineHeight, textSize, theme.TextColor, fontFamily, line.Text)
+				writeText(out, segment.Rect.X, segment.Rect.Y+line.Baseline+float64(lineIndex)*textLineHeight, textSize, theme.TextColor, fontFamily, line.Text)
 			}
 		} else if segment.Type == "image" && strings.HasPrefix(segment.DataURI, "data:image/") && segment.Rect.W > 0 && segment.Rect.H > 0 {
 			clip := ""

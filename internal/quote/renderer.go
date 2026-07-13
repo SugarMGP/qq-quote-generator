@@ -11,7 +11,10 @@ import (
 	"github.com/Penryn/qq-quote-generator/internal/resvg"
 )
 
-const defaultRenderTimeout = 8 * time.Second
+const (
+	defaultRenderTimeout = 8 * time.Second
+	outputScale          = 2.0
+)
 
 type Renderer struct {
 	loader     *ResourceLoader
@@ -50,7 +53,7 @@ func (r *Renderer) Render(ctx context.Context, messages []Message) ([]byte, erro
 	if err != nil {
 		return nil, fmt.Errorf("build SVG: %w", err)
 	}
-	png, err := r.rasterizer.Render(svg)
+	png, err := r.rasterizer.Render(svg, outputScale)
 	if err != nil {
 		return nil, fmt.Errorf("render SVG: %w", err)
 	}

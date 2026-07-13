@@ -19,7 +19,6 @@ type LoadedImage struct {
 	DataURI string
 	Width   int
 	Height  int
-	Missing bool
 	Err     error
 }
 
@@ -34,15 +33,15 @@ func NewResourceLoader(client *http.Client, maxBytes int64) *ResourceLoader {
 
 func (l *ResourceLoader) Load(ctx context.Context, source string) LoadedImage {
 	if source == "" {
-		return LoadedImage{Missing: true}
+		return LoadedImage{}
 	}
 	data, mediaType, err := l.read(ctx, source)
 	if err != nil {
-		return LoadedImage{Missing: true, Err: err}
+		return LoadedImage{Err: err}
 	}
 	config, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
-		return LoadedImage{Missing: true, Err: fmt.Errorf("decode image config: %w", err)}
+		return LoadedImage{Err: fmt.Errorf("decode image config: %w", err)}
 	}
 	return LoadedImage{
 		DataURI: "data:" + mediaType + ";base64," + base64.StdEncoding.EncodeToString(data),

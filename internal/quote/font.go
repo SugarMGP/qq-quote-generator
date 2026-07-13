@@ -21,6 +21,10 @@ type FontManager struct {
 	family string
 }
 
+type fontMetrics struct {
+	Width, Ascent, Descent float64
+}
+
 func NewSystemFontManager(families []string) (*FontManager, error) {
 	fontMap := fontscan.NewFontMap(nil)
 	if err := fontMap.UseSystemFonts(""); err != nil {
@@ -45,20 +49,35 @@ func NewSystemFontManager(families []string) (*FontManager, error) {
 func (m *FontManager) Family() string { return m.family }
 
 func (m *FontManager) Measure(text string, size float64) float64 {
+	return m.measureLine(text, size).Width
+}
+
+func (m *FontManager) measureLine(text string, size float64) fontMetrics {
 	if text == "" {
-		return 0
+		return fontMetrics{}
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	runes := []rune(text)
 	input := shaping.Input{Text: runes, RunStart: 0, RunEnd: len(runes), Direction: di.DirectionLTR, Size: fixed.Int26_6(size * 64), Language: language.DefaultLanguage()}
 	runs := shaping.SplitByFace(input, m.fonts)
-	var advance fixed.Int26_6
+	var advance, ascent, descent fixed.Int26_6
 	for _, run := range runs {
 		if run.RunStart < run.RunEnd {
 			run.Script = language.LookupScript(runes[run.RunStart])
 		}
-		advance += m.shaper.Shape(run).Advance
+		output := m.shaper.Shape(run)
+		advance += output.Advance
+		if output.GlyphBounds.Ascent > ascent {
+			ascent = output.GlyphBounds.Ascent
+		}
+		if output.GlyphBounds.Descent < descent {
+			descent = output.GlyphBounds.Descent
+		}
 	}
-	return float64(advance) / 64
+	return fontMetrics{
+		Width:   float64(advance) / 64,
+		Ascent:  float64(ascent) / 64,
+		Descent: float64(descent) / 64,
+	}
 }

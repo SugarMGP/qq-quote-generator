@@ -8,7 +8,6 @@ import (
 )
 
 type Theme struct {
-	Class     string
 	CardBG    string
 	AvatarBG  string
 	NameColor string
@@ -17,8 +16,8 @@ type Theme struct {
 }
 
 var (
-	lightTheme = Theme{"theme-light", "#f7f8fb", "#d9dee8", "#667085", "#ffffff", "#242937"}
-	darkTheme  = Theme{"theme-dark", "#1e1e2e", "#333333", "#7c7f93", "#313244", "#cdd6f4"}
+	lightTheme = Theme{"#f7f8fb", "#d9dee8", "#667085", "#ffffff", "#242937"}
+	darkTheme  = Theme{"#1e1e2e", "#333333", "#7c7f93", "#313244", "#cdd6f4"}
 )
 
 func themeForTime(t time.Time) Theme { return themeForHour(t.Hour()) }

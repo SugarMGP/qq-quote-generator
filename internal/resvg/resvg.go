@@ -42,7 +42,7 @@ func (r *Rasterizer) Close() {
 	}
 }
 
-func (r *Rasterizer) Render(svg []byte) ([]byte, error) {
+func (r *Rasterizer) Render(svg []byte, scale float64) ([]byte, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if r.options == nil {
@@ -50,6 +50,9 @@ func (r *Rasterizer) Render(svg []byte) ([]byte, error) {
 	}
 	if len(svg) == 0 {
 		return nil, fmt.Errorf("resvg input is empty")
+	}
+	if scale <= 0 || math.IsNaN(scale) || math.IsInf(scale, 0) {
+		return nil, fmt.Errorf("resvg scale must be a finite positive number")
 	}
 
 	var tree *C.resvg_render_tree
@@ -59,12 +62,15 @@ func (r *Rasterizer) Render(svg []byte) ([]byte, error) {
 	}
 	defer C.resvg_tree_destroy(tree)
 	size := C.resvg_get_image_size(tree)
-	width, height := int(math.Ceil(float64(size.width))), int(math.Ceil(float64(size.height)))
+	width := int(math.Ceil(float64(size.width) * scale))
+	height := int(math.Ceil(float64(size.height) * scale))
 	if width <= 0 || height <= 0 {
 		return nil, fmt.Errorf("resvg returned invalid size %dx%d", width, height)
 	}
 	pixels := make([]byte, width*height*4)
 	transform := C.resvg_transform_identity()
+	transform.a = C.float(scale)
+	transform.d = C.float(scale)
 	C.resvg_render(tree, transform, C.uint32_t(width), C.uint32_t(height), (*C.char)(unsafe.Pointer(&pixels[0])))
 	unpremultiply(pixels)
 	imageData := &image.NRGBA{Pix: pixels, Stride: width * 4, Rect: image.Rect(0, 0, width, height)}
