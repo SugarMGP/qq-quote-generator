@@ -74,7 +74,6 @@ QQ Quote Generator 是一个将 QQ 聊天内容渲染为引用图片的 HTTP 服
 
 以下行为是公开契约，除非需求明确要求破坏性变更，否则必须保留：
 
-- `GET /` 返回项目地址提示；
 - `POST /png/` 接收 JSON 数组，成功时返回 `image/png`；
 - `POST /base64/` 接收同样的 JSON，成功时返回 PNG 的纯 Base64 文本；
 - JSON 绑定失败返回 HTTP 400 和包含 `error` 的 JSON；

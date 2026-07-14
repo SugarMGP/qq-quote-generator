@@ -12,10 +12,6 @@ func New(renderer *quote.Renderer) *gin.Engine {
 	router := gin.Default()
 	_ = router.SetTrustedProxies(nil)
 
-	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "see https://github.com/Penryn/qq-quote-generator")
-	})
-
 	router.POST("/png/", func(c *gin.Context) {
 		var messages []quote.Message
 		if err := c.ShouldBindJSON(&messages); err != nil {
